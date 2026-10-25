@@ -1,6 +1,6 @@
 ﻿# EUR Asset Regime & Trend Breakout Backtester
 
-A Streamlit research application for EUR-quoted forex pairs and precious metals. The app discovers supported EUR-quoted forex and precious-metal symbols from Twelve Data and can load cached OHLC history for inspection. Causal feature engineering, barrier labels, and walk-forward backtesting are planned next.
+A Streamlit research application for selected forex pairs and EUR-quoted metals. The app discovers the configured forex universe plus available EUR-quoted metals from Twelve Data and can load cached OHLC history for inspection. Causal feature engineering, barrier labels, and walk-forward backtesting are planned next.
 
 ## Run locally
 

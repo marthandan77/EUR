@@ -9,6 +9,15 @@ import streamlit as st
 
 BASE_URL = "https://api.twelvedata.com"
 REQUEST_TIMEOUT_SECONDS = 25
+SELECTED_EUR_FOREX_PAIRS = {
+    "AUD/EUR",
+    "CAD/EUR",
+    "CHF/EUR",
+    "GBP/EUR",
+    "IDR/EUR",
+    "JPY/EUR",
+    "NZD/EUR",
+}
 
 
 class TwelveDataError(RuntimeError):
@@ -63,7 +72,10 @@ def _get_eur_forex_pairs(api_key: str) -> pd.DataFrame:
             continue
         symbol = str(item.get("symbol", "")).upper()
         quote_currency = str(item.get("currency_quote", "")).upper()
-        if symbol.endswith("/EUR") or quote_currency == "EUR":
+        if (
+            symbol in SELECTED_EUR_FOREX_PAIRS
+            and (symbol.endswith("/EUR") or quote_currency == "EUR")
+        ):
             rows.append(
                 {
                     "symbol": symbol,
@@ -71,6 +83,28 @@ def _get_eur_forex_pairs(api_key: str) -> pd.DataFrame:
                     "name": str(item.get("currency_group", "Forex pair")),
                 }
             )
+    return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
+
+
+@st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
+def _get_aud_nzd_pair(api_key: str) -> pd.DataFrame:
+    payload = _request_json(
+        "forex_pairs",
+        {"apikey": api_key, "symbol": "AUD/NZD", "format": "JSON"},
+    )
+    records = payload.get("data", [])
+    if not isinstance(records, list):
+        raise TwelveDataError("The AUD/NZD catalog response did not contain a symbol list.")
+    rows = [
+        {
+            "symbol": str(item.get("symbol", "AUD/NZD")).upper(),
+            "asset_class": "Forex",
+            "name": str(item.get("currency_group", "Forex pair")),
+        }
+        for item in records
+        if isinstance(item, dict)
+        and str(item.get("symbol", "")).upper() == "AUD/NZD"
+    ]
     return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
 
 
@@ -102,8 +136,11 @@ def _get_eur_metals(api_key: str) -> pd.DataFrame:
 
 
 def discover_eur_universe(api_key: str) -> pd.DataFrame:
-    """Return forex and precious-metal instruments quoted in EUR."""
-    forex = _get_eur_forex_pairs(api_key)
+    """Return selected EUR forex pairs, AUD/NZD, and available EUR metal pairs."""
+    forex = pd.concat(
+        [_get_eur_forex_pairs(api_key), _get_aud_nzd_pair(api_key)],
+        ignore_index=True,
+    )
     metals = _get_eur_metals(api_key)
     instruments = pd.concat([forex, metals], ignore_index=True)
     if instruments.empty:
