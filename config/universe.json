@@ -21,7 +21,7 @@
     "AUD/NZD": 25.0,
     "GAU/EUR": 50.0,
     "XAG/EUR": 75.0,
-    "XAGg/EUR": 75.0,
+    "XAGG/EUR": 75.0,
     "XAU/EUR": 50.0
   },
   "cost_estimates_verified": false,
@@ -39,7 +39,7 @@
     {"symbol": "AUD/NZD", "asset_class": "Forex"},
     {"symbol": "GAU/EUR", "asset_class": "Precious Metal"},
     {"symbol": "XAG/EUR", "asset_class": "Precious Metal"},
-    {"symbol": "XAGg/EUR", "asset_class": "Precious Metal"},
+    {"symbol": "XAGG/EUR", "asset_class": "Precious Metal"},
     {"symbol": "XAU/EUR", "asset_class": "Precious Metal"}
   ]
 }
