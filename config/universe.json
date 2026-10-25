@@ -18,11 +18,7 @@
     "IDR/EUR": 200.0,
     "JPY/EUR": 20.0,
     "NZD/EUR": 30.0,
-    "AUD/NZD": 25.0,
-    "GAU/EUR": 50.0,
-    "XAG/EUR": 75.0,
-    "XAGG/EUR": 75.0,
-    "XAU/EUR": 50.0
+    "AUD/NZD": 25.0
   },
   "cost_estimates_verified": false,
   "minimum_cv_trades": 30,
@@ -36,10 +32,6 @@
     {"symbol": "IDR/EUR", "asset_class": "Forex"},
     {"symbol": "JPY/EUR", "asset_class": "Forex"},
     {"symbol": "NZD/EUR", "asset_class": "Forex"},
-    {"symbol": "AUD/NZD", "asset_class": "Forex"},
-    {"symbol": "GAU/EUR", "asset_class": "Precious Metal"},
-    {"symbol": "XAG/EUR", "asset_class": "Precious Metal"},
-    {"symbol": "XAGG/EUR", "asset_class": "Precious Metal"},
-    {"symbol": "XAU/EUR", "asset_class": "Precious Metal"}
+    {"symbol": "AUD/NZD", "asset_class": "Forex"}
   ]
 }
