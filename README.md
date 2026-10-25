@@ -8,6 +8,8 @@ Edit [`config/universe.json`](config/universe.json) to add or remove tickers. Ev
 
 The initial experiment uses hourly bars, a 64-bar model window, a 24-bar maximum holding period, a 2×ATR target, and a 1×ATR stop. These are research defaults, not optimized trading parameters. Update them only as explicit, recorded experiments.
 
+The configured execution profile is Pepperstone Razor on cTrader with a USD account and a maximum planned loss of USD 100 per trade. This records the intended risk constraint; the advisor currently does not calculate executable lot sizes. A production sizing implementation must convert each signal's stop distance and contract value into USD, include the exact cTrader commission, spread, and slippage, and cap the resulting loss at USD 100. A stop can still lose more than this in gaps or adverse execution.
+
 `round_trip_cost_bps` contains provisional conservative scenario assumptions for every currently active FX symbol: 20 bps for AUD/EUR, CAD/EUR, CHF/EUR, GBP/EUR, and JPY/EUR; 200 bps for IDR/EUR; 30 bps for NZD/EUR; and 25 bps for AUD/NZD. They are round-trip costs as a fraction of notional and are not broker quotes or measured historical costs. Twelve Data OHLC bars cannot establish broker spreads, commissions, or slippage. `cost_estimates_verified` is therefore `false`; promotion and trade recommendations remain disabled until you replace these assumptions with broker-specific estimates and explicitly set it to `true`.
 
 ## Shared data and model workflow

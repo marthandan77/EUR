@@ -218,6 +218,13 @@ with data_tab:
 
 with advisor_tab:
     st.subheader("Current model view")
+    st.caption(
+        f"Risk settings: {config.get('broker', 'Unspecified')} / "
+        f"{config.get('execution_platform', 'Unspecified')} · "
+        f"{config.get('account_currency', 'USD')} account · "
+        f"maximum planned loss ${float(config.get('max_loss_per_trade_usd', 100.0)):.0f} per trade. "
+        "This is a risk limit setting; the advisor does not yet calculate executable lot sizes."
+    )
     metadata = load_json(PRODUCTION_DIR / "metadata.json")
     if not config.get("cost_estimates_verified", False):
         st.warning(
