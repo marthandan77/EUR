@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.data.shared_feed import fetch_shared_market_data, load_universe_config
+from src.data.manual_csv import load_uploaded_market_csvs
 from src.data.twelve_data import TwelveDataError, discover_eur_universe
 from src.research.evaluation import apply_portfolio_risk_limits, make_trade_advice
 from src.research.deployment import training_config_mismatches
@@ -98,9 +99,9 @@ except (ValueError, KeyError) as error:
 if not twelve_data_key:
     visible_names_text = ", ".join(visible_secret_names) if visible_secret_names else "none"
     st.warning(
-        "No Twelve Data key was detected in this app's runtime. Add a root secret named "
-        "`twelve_data_key` or `TWELVE_DATA_KEY`, or a `[twelve_data]` section with `api_key`. "
-        f"Secret field names visible to this app: {visible_names_text}. Restart or redeploy after changes."
+        "Twelve Data is unavailable in this app runtime. You can still load historical OHLC "
+        "CSV files in the Shared market data tab. Secret field names visible to this app: "
+        f"{visible_names_text}."
     )
 
 universe_tab, data_tab, advisor_tab, audit_tab = st.tabs(
@@ -131,17 +132,43 @@ with universe_tab:
     st.caption(f"{len(configured_symbols)} configured tickers. One shared time series per ticker feeds all models.")
 
 with data_tab:
-    st.subheader("Shared Twelve Data snapshot")
+    st.subheader("Shared market data")
     interval = str(config.get("interval", "1h"))
     history_bars = int(config.get("history_bars", 5000))
+    st.caption(
+        "Without an API key, upload broker or data-vendor OHLC CSV exports below. "
+        "This fallback loads historical data for inspection; it does not enable model promotion or trade advice."
+    )
+    manual_uploads = st.file_uploader(
+        "Upload OHLC CSV files (one combined file with a symbol column, or one file per ticker)",
+        type=["csv"],
+        accept_multiple_files=True,
+        key="manual_ohlc_uploads",
+    )
+    st.download_button(
+        "Download CSV template",
+        data="datetime,open,high,low,close,symbol\n",
+        file_name="ohlc_template.csv",
+        mime="text/csv",
+    )
+    if st.button("Load uploaded CSV data", disabled=not manual_uploads):
+        try:
+            st.session_state["shared_market_data"] = load_uploaded_market_csvs(
+                manual_uploads, configured_symbols
+            )
+            st.session_state["shared_data_source"] = "Uploaded CSV"
+            st.session_state["shared_data_error"] = None
+        except ValueError as error:
+            st.session_state["shared_data_error"] = str(error)
     if not twelve_data_key:
-        st.info("Configure the API key to load the shared market-data snapshot.")
+        st.info("Twelve Data is unavailable in this runtime. Use the CSV upload above to inspect historical market data.")
     elif st.button("Fetch shared data", type="primary"):
         with st.spinner("Fetching one OHLC history per configured symbol…"):
             try:
                 st.session_state["shared_market_data"] = cached_shared_market_data(
                     twelve_data_key, configured_symbols, interval, history_bars
                 )
+                st.session_state["shared_data_source"] = "Twelve Data"
                 st.session_state["shared_data_error"] = None
             except TwelveDataError as error:
                 st.session_state["shared_data_error"] = str(error)
@@ -149,6 +176,7 @@ with data_tab:
         st.error(st.session_state["shared_data_error"])
     shared_data = st.session_state.get("shared_market_data")
     if shared_data is not None and not shared_data.empty:
+        st.caption(f"Data source: {st.session_state.get('shared_data_source', 'Unknown')}")
         summary = (
             shared_data.groupby(["symbol", "asset_class"], as_index=False)
             .agg(bars=("datetime", "size"), first_bar=("datetime", "min"), last_bar=("datetime", "max"))
