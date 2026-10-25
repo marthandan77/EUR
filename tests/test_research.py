@@ -235,6 +235,31 @@ def test_shared_feed_fetches_each_configured_symbol_once(monkeypatch):
     assert len(data) == 4  # The last possibly incomplete bar is discarded per symbol.
 
 
+def test_shared_feed_partial_mode_keeps_available_symbols_but_strict_mode_fails(monkeypatch):
+    def fake_get_time_series(api_key, symbol, interval, output_size):
+        if symbol == "XAU/EUR":
+            raise shared_feed.TwelveDataError("Twelve Data returned HTTP 404.")
+        return pd.DataFrame({
+            "datetime": pd.date_range("2024-01-01", periods=3, freq="h", tz="UTC"),
+            "open": [1.0, 1.1, 1.2],
+            "high": [1.1, 1.2, 1.3],
+            "low": [0.9, 1.0, 1.1],
+            "close": [1.05, 1.15, 1.25],
+        })
+
+    monkeypatch.setattr(shared_feed, "get_time_series", fake_get_time_series)
+    symbols = [
+        {"symbol": "AUD/EUR", "asset_class": "Forex"},
+        {"symbol": "XAU/EUR", "asset_class": "Precious Metal"},
+    ]
+    partial = shared_feed.fetch_shared_market_data("fake", symbols, "1h", 3, allow_partial=True)
+    assert partial["symbol"].unique().tolist() == ["AUD/EUR"]
+    assert partial.attrs["partial_universe"]
+    assert partial.attrs["load_failures"] == ["XAU/EUR: Twelve Data returned HTTP 404."]
+    with pytest.raises(shared_feed.TwelveDataError, match="Data load incomplete"):
+        shared_feed.fetch_shared_market_data("fake", symbols, "1h", 3)
+
+
 def test_provider_error_never_exposes_api_key(monkeypatch):
     class FakeResponse:
         status_code = 200

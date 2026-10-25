@@ -43,9 +43,10 @@ def cached_shared_market_data(
     configured_symbols: tuple[tuple[str, str], ...],
     interval: str,
     output_size: int,
+    allow_partial: bool = False,
 ) -> pd.DataFrame:
     symbols = [{"symbol": symbol, "asset_class": asset_class} for symbol, asset_class in configured_symbols]
-    return fetch_shared_market_data(api_key, symbols, interval, output_size)
+    return fetch_shared_market_data(api_key, symbols, interval, output_size, allow_partial=allow_partial)
 
 
 @st.cache_resource(show_spinner=False)
@@ -157,23 +158,37 @@ with data_tab:
                 manual_uploads, configured_symbols
             )
             st.session_state["shared_data_source"] = "Uploaded CSV"
+            st.session_state["shared_data_failures"] = []
             st.session_state["shared_data_error"] = None
         except ValueError as error:
             st.session_state["shared_data_error"] = str(error)
+            st.session_state["shared_data_failures"] = []
     if not twelve_data_key:
         st.info("Twelve Data is unavailable in this runtime. Use the CSV upload above to inspect historical market data.")
     elif st.button("Fetch shared data", type="primary"):
         with st.spinner("Fetching one OHLC history per configured symbol…"):
             try:
                 st.session_state["shared_market_data"] = cached_shared_market_data(
-                    twelve_data_key, configured_symbols, interval, history_bars
+                    twelve_data_key, configured_symbols, interval, history_bars,
+                    allow_partial=True,
                 )
                 st.session_state["shared_data_source"] = "Twelve Data"
+                st.session_state["shared_data_failures"] = st.session_state[
+                    "shared_market_data"
+                ].attrs.get("load_failures", [])
                 st.session_state["shared_data_error"] = None
             except TwelveDataError as error:
                 st.session_state["shared_data_error"] = str(error)
+                st.session_state["shared_data_failures"] = []
     if st.session_state.get("shared_data_error"):
         st.error(st.session_state["shared_data_error"])
+    if st.session_state.get("shared_data_failures"):
+        st.warning(
+            "Partial market data loaded. Unavailable tickers: "
+            + " | ".join(st.session_state["shared_data_failures"])
+            + ". This partial universe is for inspection only and cannot be used for model training or trade advice. "
+            "Twelve Data commodity history requires an eligible plan."
+        )
     shared_data = st.session_state.get("shared_market_data")
     if shared_data is not None and not shared_data.empty:
         st.caption(f"Data source: {st.session_state.get('shared_data_source', 'Unknown')}")

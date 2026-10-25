@@ -38,8 +38,9 @@ def fetch_shared_market_data(
     symbols: list[dict[str, str]],
     interval: str,
     output_size: int,
+    allow_partial: bool = False,
 ) -> pd.DataFrame:
-    """Fetch one shared OHLC dataset for all model candidates."""
+    """Fetch one shared OHLC dataset; training stays strict unless explicitly relaxed."""
     frames: list[pd.DataFrame] = []
     failures: list[str] = []
     for instrument in symbols:
@@ -62,10 +63,13 @@ def fetch_shared_market_data(
         bars["asset_class"] = instrument["asset_class"]
         frames.append(bars)
 
-    if failures:
+    if failures and not allow_partial:
         raise TwelveDataError("Data load incomplete. " + " | ".join(failures))
     if not frames:
-        raise TwelveDataError("No configured market data could be loaded.")
+        detail = " " + " | ".join(failures) if failures else ""
+        raise TwelveDataError("No configured market data could be loaded." + detail)
     shared = pd.concat(frames, ignore_index=True)
     shared = shared.sort_values(["symbol", "datetime"]).reset_index(drop=True)
+    shared.attrs["load_failures"] = failures
+    shared.attrs["partial_universe"] = bool(failures)
     return shared
