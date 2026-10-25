@@ -10,6 +10,7 @@ MODEL_RETRAIN_KEYS = (
     "target_atr",
     "stop_atr",
     "minimum_expected_net_r",
+    "cost_estimates_verified",
 )
 
 

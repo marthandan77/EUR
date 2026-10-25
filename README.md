@@ -8,7 +8,7 @@ Edit [`config/universe.json`](config/universe.json) to add or remove tickers. Ev
 
 The initial experiment uses hourly bars, a 64-bar model window, a 24-bar maximum holding period, a 2×ATR target, and a 1×ATR stop. These are research defaults, not optimized trading parameters. Update them only as explicit, recorded experiments.
 
-Populate `round_trip_cost_bps` in the config with a realistic round-trip estimate for **every** active symbol before enabling promotion. Include spread, commission, and expected slippage in that estimate. The default is intentionally empty: Twelve Data OHLC bars do not contain enough information to infer execution costs, so the system will not promote a model or issue a trade recommendation while costs are missing.
+`round_trip_cost_bps` contains provisional conservative scenario assumptions for every currently active symbol. The assumptions are 20 bps for the listed liquid FX crosses, 25–30 bps for AUD/NZD and NZD/EUR, 200 bps for IDR/EUR, 50 bps for gold symbols, and 75 bps for silver symbols. They are round-trip costs as a fraction of notional and are not broker quotes or measured historical costs. Twelve Data OHLC bars cannot establish broker spreads, commissions, or slippage. `cost_estimates_verified` is therefore `false`; promotion and trade recommendations remain disabled until you replace these assumptions with broker-specific estimates and explicitly set it to `true`.
 
 ## Shared data and model workflow
 

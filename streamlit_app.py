@@ -151,7 +151,12 @@ with data_tab:
 with advisor_tab:
     st.subheader("Current model view")
     metadata = load_json(PRODUCTION_DIR / "metadata.json")
-    if not metadata or not metadata.get("promoted"):
+    if not config.get("cost_estimates_verified", False):
+        st.warning(
+            "Trade advice is disabled because the configured round-trip costs are provisional. "
+            "Verify them against your broker's spreads, commissions, and expected slippage first."
+        )
+    elif not metadata or not metadata.get("promoted"):
         st.info(
             "No promoted model set is available yet. Run the scheduled GitHub Action after "
             "adding `TWELVE_DATA_KEY` to GitHub repository Actions secrets and configuring "
@@ -226,6 +231,7 @@ with advisor_tab:
                             min_expected_net_r=float(config.get("minimum_expected_net_r", 0.10)),
                             required_model_count=3,
                             timeout_payoffs_by_model=model_timeout_payoffs,
+                            cost_estimates_verified=bool(config.get("cost_estimates_verified", False)),
                         )
                         advice = advice.sort_values("expected_net_r", ascending=False).drop_duplicates(
                             "symbol", keep="first"

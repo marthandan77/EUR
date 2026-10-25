@@ -102,6 +102,7 @@ def make_trade_advice(
     agreement_tolerance: float = 0.20,
     required_model_count: int = 3,
     timeout_payoffs_by_model: dict[str, dict[str, float]] | None = None,
+    cost_estimates_verified: bool = False,
 ) -> pd.DataFrame:
     """Combine calibrated candidates conservatively; disagreement yields no trade."""
     model_names = list(probabilities_by_model)
@@ -161,7 +162,7 @@ def make_trade_advice(
     summary["model_agreement"] = (
         summary["model_expected_r_max"] - summary["model_expected_r_min"]
     ).le(agreement_tolerance)
-    all_costs_present = summary["symbol"].isin(round_trip_cost_bps)
+    all_costs_present = summary["symbol"].isin(round_trip_cost_bps) & cost_estimates_verified
     summary["recommendation"] = np.where(
         all_costs_present
         & summary["model_agreement"]

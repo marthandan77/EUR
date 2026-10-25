@@ -175,6 +175,25 @@ def test_trade_advisor_abstains_without_costs():
     assert advice.loc[0, "recommendation"] == "No trade"
 
 
+def test_trade_advisor_abstains_when_costs_are_provisional():
+    row = pd.DataFrame({
+        "datetime": [pd.Timestamp("2024-01-01", tz="UTC")],
+        "symbol": ["AUD/EUR"],
+        "side": [1.0],
+        "entry_price": [100.0],
+        "risk_distance": [1.0],
+        "label": [2],
+        "realized_r": [2.0],
+        "label_end_datetime": [pd.Timestamp("2024-01-02", tz="UTC")],
+    })
+    probabilities = {name: np.array([[0.05, 0.05, 0.90]]) for name in MODEL_NAMES}
+    advice = make_trade_advice(
+        row, probabilities, target_atr=2, stop_atr=1,
+        round_trip_cost_bps={"AUD/EUR": 20.0}, min_expected_net_r=0.1,
+    )
+    assert advice.loc[0, "recommendation"] == "No trade"
+
+
 def test_portfolio_overlay_limits_shared_eur_factor_exposure():
     advice = pd.DataFrame({
         "datetime": [pd.Timestamp("2024-01-01", tz="UTC")] * 2,
@@ -298,3 +317,5 @@ def test_all_three_models_complete_a_small_walk_forward_audit(tmp_path):
     assert report["sample_count"] > 0
     assert (tmp_path / "artifacts" / "latest_report.json").exists()
     assert not report["promoted"]
+    assert not report["cost_estimates_verified"]
+    assert any("provisional" in reason for reason in report["promotion_reasons"])

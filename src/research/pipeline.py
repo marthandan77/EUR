@@ -271,6 +271,8 @@ def train_and_audit(
         promotion_reasons.append("All three required model candidates did not complete successfully.")
     if not costs_complete:
         promotion_reasons.append("Per-symbol round-trip costs are not configured for every active instrument.")
+    if not config.get("cost_estimates_verified", False):
+        promotion_reasons.append("Round-trip costs are provisional and have not been verified against broker execution pricing.")
     if selected_report["cv_trade_count"] < int(config.get("minimum_cv_trades", 30)):
         promotion_reasons.append("Walk-forward sample produced too few candidate trades.")
     if selected_report["cv_positive_folds"] < required_cv_folds:
@@ -290,6 +292,7 @@ def train_and_audit(
         "active_symbols": sorted(shared_market_data["symbol"].unique().tolist()),
         "config": config,
         "costs_complete": costs_complete,
+        "cost_estimates_verified": bool(config.get("cost_estimates_verified", False)),
         "selected_candidate": selected_name,
         "promoted": promoted,
         "promotion_reasons": promotion_reasons,
