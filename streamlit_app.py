@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+from collections.abc import Mapping
 
 import joblib
 import pandas as pd
@@ -58,16 +60,31 @@ def load_json(path: Path) -> dict | None:
         return None
 
 
+def resolve_twelve_data_secret(secrets) -> tuple[str, tuple[str, ...]]:
+    """Read common Twelve Data secret names without exposing their values."""
+    visible_names = []
+    for name, value in secrets.items():
+        normalized_name = re.sub(r"[^a-z0-9]", "", str(name).lower())
+        visible_names.append(str(name))
+        if normalized_name in {"twelvedatakey", "twelvedataapikey"} and value:
+            return str(value).strip(), tuple(visible_names)
+        if normalized_name == "twelvedata" and isinstance(value, Mapping):
+            for child_name, child_value in value.items():
+                visible_names.append(f"{name}.{child_name}")
+                normalized_child = re.sub(r"[^a-z0-9]", "", str(child_name).lower())
+                if normalized_child in {"key", "apikey"} and child_value:
+                    return str(child_value).strip(), tuple(visible_names)
+    return "", tuple(visible_names)
+
+
 st.title("EUR Asset Regime & Trend Breakout Advisor")
 st.caption("Shared Twelve Data feed · LSTM · TCN · gradient-boosted trees")
 
 try:
-    twelve_data_key = str(
-        st.secrets.get("twelve_data_key", "")
-        or st.secrets.get("TWELVE_DATA_KEY", "")
-    ).strip()
+    twelve_data_key, visible_secret_names = resolve_twelve_data_secret(st.secrets)
 except Exception:
     twelve_data_key = ""
+    visible_secret_names = ()
 
 try:
     config = load_universe_config()
@@ -79,10 +96,11 @@ except (ValueError, KeyError) as error:
     st.stop()
 
 if not twelve_data_key:
+    visible_names_text = ", ".join(visible_secret_names) if visible_secret_names else "none"
     st.warning(
-        "No Twelve Data key was detected in this app's runtime. Streamlit Secrets must "
-        "include `twelve_data_key` or `TWELVE_DATA_KEY`; after changing cloud secrets, "
-        "restart or redeploy the app."
+        "No Twelve Data key was detected in this app's runtime. Add a root secret named "
+        "`twelve_data_key` or `TWELVE_DATA_KEY`, or a `[twelve_data]` section with `api_key`. "
+        f"Secret field names visible to this app: {visible_names_text}. Restart or redeploy after changes."
     )
 
 universe_tab, data_tab, advisor_tab, audit_tab = st.tabs(
