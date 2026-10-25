@@ -62,7 +62,10 @@ st.title("EUR Asset Regime & Trend Breakout Advisor")
 st.caption("Shared Twelve Data feed · LSTM · TCN · gradient-boosted trees")
 
 try:
-    twelve_data_key = str(st.secrets.get("twelve_data_key", "")).strip()
+    twelve_data_key = str(
+        st.secrets.get("twelve_data_key", "")
+        or st.secrets.get("TWELVE_DATA_KEY", "")
+    ).strip()
 except Exception:
     twelve_data_key = ""
 
@@ -76,7 +79,11 @@ except (ValueError, KeyError) as error:
     st.stop()
 
 if not twelve_data_key:
-    st.warning("Add `twelve_data_key` to Streamlit Secrets to load market data.")
+    st.warning(
+        "No Twelve Data key was detected in this app's runtime. Streamlit Secrets must "
+        "include `twelve_data_key` or `TWELVE_DATA_KEY`; after changing cloud secrets, "
+        "restart or redeploy the app."
+    )
 
 universe_tab, data_tab, advisor_tab, audit_tab = st.tabs(
     ["Universe", "Shared data", "Trade advisor", "Model audit"]
