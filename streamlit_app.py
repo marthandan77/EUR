@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 st.title("EUR Asset Regime & Trend Breakout Backtester")
-st.caption("Research workspace for EUR-quoted forex pairs and precious metals.")
+st.caption("Research workspace for EUR-quoted forex pairs and metals.")
 
 try:
     twelve_data_key = st.secrets.get("twelve_data_key", "").strip()
@@ -49,10 +49,12 @@ with universe_tab:
     st.subheader("Available EUR-quoted instruments")
     if not instrument_universe.empty:
         forex_count = int(instrument_universe["asset_class"].eq("Forex").sum())
-        metal_count = int(instrument_universe["asset_class"].eq("Precious metal").sum())
+        metal_count = int(
+            instrument_universe["asset_class"].str.contains("metal", case=False).sum()
+        )
         metric_columns = st.columns(2)
         metric_columns[0].metric("Forex pairs", forex_count)
-        metric_columns[1].metric("Precious metals", metal_count)
+        metric_columns[1].metric("Metal pairs", metal_count)
         st.dataframe(
             instrument_universe,
             use_container_width=True,

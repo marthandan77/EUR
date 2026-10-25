@@ -75,10 +75,10 @@ def _get_eur_forex_pairs(api_key: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
-def _get_eur_precious_metals(api_key: str) -> pd.DataFrame:
+def _get_eur_metals(api_key: str) -> pd.DataFrame:
     payload = _request_json(
         "commodities",
-        {"apikey": api_key, "category": "Precious Metal", "format": "JSON"},
+        {"apikey": api_key, "format": "JSON"},
     )
     records = payload.get("data", [])
     if not isinstance(records, list):
@@ -88,13 +88,14 @@ def _get_eur_precious_metals(api_key: str) -> pd.DataFrame:
     for item in records:
         if not isinstance(item, dict):
             continue
-        symbol = str(item.get("symbol", "")).upper()
-        if symbol.endswith("/EUR"):
+        symbol = str(item.get("symbol", "")).strip()
+        category = str(item.get("category", "")).strip()
+        if symbol.upper().endswith("/EUR") and "metal" in category.casefold():
             rows.append(
                 {
                     "symbol": symbol,
-                    "asset_class": "Precious metal",
-                    "name": str(item.get("name", "Precious metal")),
+                    "asset_class": category,
+                    "name": str(item.get("name", category or "Metal")),
                 }
             )
     return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
@@ -103,7 +104,7 @@ def _get_eur_precious_metals(api_key: str) -> pd.DataFrame:
 def discover_eur_universe(api_key: str) -> pd.DataFrame:
     """Return forex and precious-metal instruments quoted in EUR."""
     forex = _get_eur_forex_pairs(api_key)
-    metals = _get_eur_precious_metals(api_key)
+    metals = _get_eur_metals(api_key)
     instruments = pd.concat([forex, metals], ignore_index=True)
     if instruments.empty:
         return instruments
