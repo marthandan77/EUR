@@ -1,0 +1,31 @@
+{
+  "interval": "1h",
+  "history_bars": 5000,
+  "lookback_bars": 64,
+  "holding_bars": 24,
+  "target_atr": 2.0,
+  "stop_atr": 1.0,
+  "minimum_expected_net_r": 0.10,
+  "max_simultaneous_positions": 3,
+  "max_factor_exposure_units": 2.0,
+  "max_same_direction_correlation": 0.85,
+  "correlation_lookback_bars": 168,
+  "round_trip_cost_bps": {},
+  "minimum_cv_trades": 30,
+  "minimum_holdout_trades": 10,
+  "cv_folds": 3,
+  "symbols": [
+    {"symbol": "AUD/EUR", "asset_class": "Forex"},
+    {"symbol": "CAD/EUR", "asset_class": "Forex"},
+    {"symbol": "CHF/EUR", "asset_class": "Forex"},
+    {"symbol": "GBP/EUR", "asset_class": "Forex"},
+    {"symbol": "IDR/EUR", "asset_class": "Forex"},
+    {"symbol": "JPY/EUR", "asset_class": "Forex"},
+    {"symbol": "NZD/EUR", "asset_class": "Forex"},
+    {"symbol": "AUD/NZD", "asset_class": "Forex"},
+    {"symbol": "GAU/EUR", "asset_class": "Precious Metal"},
+    {"symbol": "XAG/EUR", "asset_class": "Precious Metal"},
+    {"symbol": "XAGg/EUR", "asset_class": "Precious Metal"},
+    {"symbol": "XAU/EUR", "asset_class": "Precious Metal"}
+  ]
+}

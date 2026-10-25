@@ -1,23 +1,14 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pandas as pd
 import requests
-import streamlit as st
 
 
 BASE_URL = "https://api.twelvedata.com"
 REQUEST_TIMEOUT_SECONDS = 25
-SELECTED_EUR_FOREX_PAIRS = {
-    "AUD/EUR",
-    "CAD/EUR",
-    "CHF/EUR",
-    "GBP/EUR",
-    "IDR/EUR",
-    "JPY/EUR",
-    "NZD/EUR",
-}
 
 
 class TwelveDataError(RuntimeError):
@@ -27,22 +18,56 @@ class TwelveDataError(RuntimeError):
 def _request_json(endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
     """Call Twelve Data and normalize transport and provider errors."""
     url = f"{BASE_URL}/{endpoint.lstrip('/')}"
-    try:
-        response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
-        response.raise_for_status()
-    except requests.Timeout as error:
-        raise TwelveDataError("The request timed out. Try again shortly.") from error
-    except requests.HTTPError as error:
-        status_code = error.response.status_code if error.response is not None else "unknown"
-        raise TwelveDataError(f"Twelve Data returned HTTP {status_code}.") from error
-    except requests.RequestException as error:
-        raise TwelveDataError("Could not connect to Twelve Data. Check the app's network access.") from error
+    payload: dict[str, Any] | None = None
+    last_exception: Exception | None = None
+    for attempt in range(3):
+        try:
+            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
+            if response.status_code == 429 or response.status_code >= 500:
+                if attempt < 2:
+                    retry_after = response.headers.get("Retry-After")
+                    try:
+                        delay = min(60.0, max(1.0, float(retry_after))) if retry_after else 2.0 ** attempt
+                    except ValueError:
+                        delay = 2.0 ** attempt
+                    if response.status_code == 429 and not retry_after:
+                        delay = 60.0
+                    time.sleep(delay)
+                    continue
+            response.raise_for_status()
+            payload = response.json()
+            if isinstance(payload, dict) and (payload.get("status") == "error" or payload.get("code")):
+                provider_message = str(payload.get("message", "")).casefold()
+                rate_limited = "per minute" in provider_message or "rate limit" in provider_message
+                if rate_limited and attempt < 2:
+                    retry_after = response.headers.get("Retry-After")
+                    try:
+                        delay = min(60.0, max(1.0, float(retry_after))) if retry_after else 60.0
+                    except ValueError:
+                        delay = 60.0
+                    time.sleep(delay)
+                    continue
+            break
+        except requests.Timeout as error:
+            last_exception = error
+            if attempt < 2:
+                time.sleep(2.0 ** attempt)
+                continue
+            raise TwelveDataError("The request timed out after retries. Try again shortly.") from error
+        except requests.HTTPError as error:
+            status_code = error.response.status_code if error.response is not None else "unknown"
+            raise TwelveDataError(f"Twelve Data returned HTTP {status_code}.") from error
+        except requests.RequestException as error:
+            last_exception = error
+            if attempt < 2:
+                time.sleep(2.0 ** attempt)
+                continue
+            raise TwelveDataError("Could not connect to Twelve Data after retries.") from error
+        except ValueError as error:
+            raise TwelveDataError("Twelve Data returned a response that was not valid JSON.") from error
 
-    try:
-        payload = response.json()
-    except ValueError as error:
-        raise TwelveDataError("Twelve Data returned a response that was not valid JSON.") from error
-
+    if payload is None:
+        raise TwelveDataError("Twelve Data request failed after retries.") from last_exception
     if not isinstance(payload, dict):
         raise TwelveDataError("Twelve Data returned an unexpected response format.")
 
@@ -56,103 +81,57 @@ def _request_json(endpoint: str, params: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-@st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
-def _get_eur_forex_pairs(api_key: str) -> pd.DataFrame:
-    payload = _request_json(
+def discover_eur_universe(
+    api_key: str, configured_symbols: list[dict[str, str]]
+) -> pd.DataFrame:
+    """Validate configured symbols using one request per provider catalog."""
+    forex_payload = _request_json(
         "forex_pairs",
-        {"apikey": api_key, "currency_quote": "EUR", "format": "JSON"},
+        {"apikey": api_key, "outputsize": 5000, "format": "JSON"},
     )
-    records = payload.get("data", [])
-    if not isinstance(records, list):
-        raise TwelveDataError("The forex catalog response did not contain a symbol list.")
-
-    rows = []
-    for item in records:
-        if not isinstance(item, dict):
-            continue
-        symbol = str(item.get("symbol", "")).upper()
-        quote_currency = str(item.get("currency_quote", "")).upper()
-        if (
-            symbol in SELECTED_EUR_FOREX_PAIRS
-            and (symbol.endswith("/EUR") or quote_currency == "EUR")
-        ):
-            rows.append(
-                {
-                    "symbol": symbol,
-                    "asset_class": "Forex",
-                    "name": str(item.get("currency_group", "Forex pair")),
-                }
-            )
-    return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
-
-
-@st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
-def _get_aud_nzd_pair(api_key: str) -> pd.DataFrame:
-    payload = _request_json(
-        "forex_pairs",
-        {"apikey": api_key, "symbol": "AUD/NZD", "format": "JSON"},
-    )
-    records = payload.get("data", [])
-    if not isinstance(records, list):
-        raise TwelveDataError("The AUD/NZD catalog response did not contain a symbol list.")
-    rows = [
-        {
-            "symbol": str(item.get("symbol", "AUD/NZD")).upper(),
-            "asset_class": "Forex",
-            "name": str(item.get("currency_group", "Forex pair")),
-        }
-        for item in records
-        if isinstance(item, dict)
-        and str(item.get("symbol", "")).upper() == "AUD/NZD"
-    ]
-    return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
-
-
-@st.cache_data(ttl=24 * 60 * 60, show_spinner=False)
-def _get_eur_metals(api_key: str) -> pd.DataFrame:
-    payload = _request_json(
+    commodity_payload = _request_json(
         "commodities",
-        {"apikey": api_key, "format": "JSON"},
+        {"apikey": api_key, "outputsize": 5000, "format": "JSON"},
     )
-    records = payload.get("data", [])
-    if not isinstance(records, list):
-        raise TwelveDataError("The commodity catalog response did not contain a symbol list.")
-
-    rows = []
-    for item in records:
-        if not isinstance(item, dict):
+    forex_records = forex_payload.get("data", [])
+    commodity_records = commodity_payload.get("data", [])
+    if not isinstance(forex_records, list) or not isinstance(commodity_records, list):
+        raise TwelveDataError("A Twelve Data catalog response did not contain a symbol list.")
+    forex_by_symbol = {
+        str(item.get("symbol", "")).casefold(): item
+        for item in forex_records
+        if isinstance(item, dict)
+    }
+    commodity_by_symbol = {
+        str(item.get("symbol", "")).casefold(): item
+        for item in commodity_records
+        if isinstance(item, dict)
+    }
+    records = []
+    missing_symbols = []
+    for configured in configured_symbols:
+        symbol = str(configured["symbol"]).strip()
+        asset_class = str(configured["asset_class"]).strip()
+        catalog = forex_by_symbol if asset_class.casefold() == "forex" else commodity_by_symbol
+        item = catalog.get(symbol.casefold())
+        if item is None:
+            missing_symbols.append(symbol)
             continue
-        symbol = str(item.get("symbol", "")).strip()
-        category = str(item.get("category", "")).strip()
-        if symbol.upper().endswith("/EUR") and "metal" in category.casefold():
-            rows.append(
-                {
-                    "symbol": symbol,
-                    "asset_class": category,
-                    "name": str(item.get("name", category or "Metal")),
-                }
-            )
-    return pd.DataFrame(rows, columns=["symbol", "asset_class", "name"])
+        records.append(
+            {
+                "symbol": str(item.get("symbol", symbol)),
+                "asset_class": str(item.get("category", asset_class)),
+                "name": str(item.get("name", item.get("currency_group", symbol))),
+            }
+        )
+    if missing_symbols:
+        raise TwelveDataError(
+            "Symbols not found in the configured Twelve Data catalogs: "
+            + ", ".join(missing_symbols)
+        )
+    return pd.DataFrame(records, columns=["symbol", "asset_class", "name"])
 
 
-def discover_eur_universe(api_key: str) -> pd.DataFrame:
-    """Return selected EUR forex pairs, AUD/NZD, and available EUR metal pairs."""
-    forex = pd.concat(
-        [_get_eur_forex_pairs(api_key), _get_aud_nzd_pair(api_key)],
-        ignore_index=True,
-    )
-    metals = _get_eur_metals(api_key)
-    instruments = pd.concat([forex, metals], ignore_index=True)
-    if instruments.empty:
-        return instruments
-    return (
-        instruments.drop_duplicates(subset=["symbol", "asset_class"])
-        .sort_values(["asset_class", "symbol"])
-        .reset_index(drop=True)
-    )
-
-
-@st.cache_data(ttl=15 * 60, show_spinner=False)
 def get_time_series(
     api_key: str,
     symbol: str,
