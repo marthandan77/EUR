@@ -8,7 +8,7 @@ A Streamlit research application for EUR-quoted forex pairs and precious metals.
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-streamlit run app.py
+streamlit run streamlit_app.py
 ```
 
 ## Configure Twelve Data
@@ -20,3 +20,4 @@ twelve_data_key = "YOUR_API_KEY"
 ```
 
 Do not commit that file. For Streamlit Community Cloud, add the same key in the app's Secrets settings.
+
